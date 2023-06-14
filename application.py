@@ -6,13 +6,25 @@ from stoken import token
 from cmail import sendmail
 from itsdangerous import URLSafeTimedSerializer
 import mysql.connector
+import os
 from io import BytesIO
 app=Flask(__name__)
 app.secret_key=secret_key
 app.config['SESSION_TYPE']='filesystem'
 Session(app)
 excel.init_excel(app)
-mydb=mysql.connector.connect(host='localhost',user='root',password='14122002',db='prm')
+#mydb=mysql.connector.connect(host='localhost',user='root',password='14122002',db='prm')
+db=os.environ['RDS_DB_NAME'],
+user=os.environ['RDS_USERNAME'],
+password=os.environ['RDS_PASSWORD'],
+host=os.environ['RDS_HOSTNAME'],
+port=os.environ['RDS_PORT']
+with mysql.connector.connect(host=host,user=user,password=password,db=db) as conn:
+    cursor=conn.cursor(buffered=True)
+    cursor.execute('create table if not exists users(username varchar(15) primary key,password varchar(15),email varchar(80),email_status enum("confirmed","not confirmed"))')
+    cursor.execute('create table if not exists notes(nid BINARY(16) PRIMARY KEY,title TINYTEXT,content TEXT,date TIMESTAMP DEFAULT CURRENT_TIMESTAMP on update current_timestamp,added_by VARCHAR(15),FOREIGN KEY (added_by) REFERENCES users(username))')
+    cursor.execute('create table if not exists files(fid binary(16) primary key,extension varchar(8),filedata longblob,date timestamp default now() on update now(),added_by varchar(15), FOREIGN KEY (added_by) REFERENCES users(username))')                
+mydb=mysql.connector.connect(host=host,user=user,password=password,db=db)
 @app.route('/')
 def index():
     return render_template('title.html')
@@ -239,6 +251,7 @@ def vnid(uid):
     if session.get('user'):
         cursor=mydb.cursor(buffered=True)
         cursor.execute('select bin_to_uuid(nid),title,content,date from notes where bin_to_uuid(nid)=%s',[uid])
+        cursor.close()
         uid,title,content,date=cursor.fetchone()
         return render_template('viewnotes.html',title=title,content=content,date=date)
     else:
@@ -347,6 +360,7 @@ def getdata():
         array_data.insert(0,columns)
         return excel.make_response_from_array(array_data,'xlsx',filename='notesdata')  
     else:
-        return redirect(url_for('login'))     
-app.run(debug=True,use_reloader=True)
+        return redirect(url_for('login'))
+if __name__=="__main__" :        
+  app.run()
 
