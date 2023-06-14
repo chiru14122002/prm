@@ -6,24 +6,24 @@ from stoken import token
 from cmail import sendmail
 from itsdangerous import URLSafeTimedSerializer
 import mysql.connector
-import os
 from io import BytesIO
+import os
 app=Flask(__name__)
 app.secret_key=secret_key
 app.config['SESSION_TYPE']='filesystem'
 Session(app)
 excel.init_excel(app)
-#mydb=mysql.connector.connect(host='localhost',user='root',password='14122002',db='prm')
-db=os.environ['RDS_DB_NAME'],
-user=os.environ['RDS_USERNAME'],
-password=os.environ['RDS_PASSWORD'],
-host=os.environ['RDS_HOSTNAME'],
+#mydb=mysql.connector.connect(host='localhost',user='root',password='admin',db='prm')
+db= os.environ['RDS_DB_NAME']
+user=os.environ['RDS_USERNAME']
+password=os.environ['RDS_PASSWORD']
+host=os.environ['RDS_HOSTNAME']
 port=os.environ['RDS_PORT']
 with mysql.connector.connect(host=host,user=user,password=password,db=db) as conn:
     cursor=conn.cursor(buffered=True)
     cursor.execute('create table if not exists users(username varchar(15) primary key,password varchar(15),email varchar(80),email_status enum("confirmed","not confirmed"))')
     cursor.execute('create table if not exists notes(nid BINARY(16) PRIMARY KEY,title TINYTEXT,content TEXT,date TIMESTAMP DEFAULT CURRENT_TIMESTAMP on update current_timestamp,added_by VARCHAR(15),FOREIGN KEY (added_by) REFERENCES users(username))')
-    cursor.execute('create table if not exists files(fid binary(16) primary key,extension varchar(8),filedata longblob,date timestamp default now() on update now(),added_by varchar(15), FOREIGN KEY (added_by) REFERENCES users(username))')                
+    cursor.execute('create table if not exists files(fid binary(16) primary key,extension varchar(8),filedata longblob,date timestamp default now() on update now(),added_by varchar(15), FOREIGN KEY (added_by) REFERENCES users(username))')
 mydb=mysql.connector.connect(host=host,user=user,password=password,db=db)
 @app.route('/')
 def index():
@@ -222,30 +222,30 @@ def logout():
 @app.route('/addnotes',methods=['POST','GET'])
 def addnotes():
     if session.get('user'):
-       if request.method=='POST':
-           title=request.form['title']
-           content=request.form['content']
-           username=session.get('user')
-           cursor=mydb.cursor(buffered=True)
-           cursor.execute('insert into notes (nid,title,content,added_by) values(UUID_TO_BIN(UUID()),%s,%s,%s)',[title,content,username])
-           mydb.commit()
-           cursor.close()
-           flash('Notes added successfully')
-           return redirect(url_for('viewnotes'))
-       return render_template('addnotes.html') 
+        if request.method=='POST':
+            title=request.form['title']
+            content=request.form['content']
+            username=session.get('user')
+            cursor=mydb.cursor(buffered=True)
+            cursor.execute('insert into notes (nid,title,content,added_by) values(UUID_TO_BIN(UUID()),%s,%s,%s)',[title,content,username])
+            mydb.commit()
+            cursor.close()
+            flash('Notes added successfully')
+            return redirect(url_for('viewnotes'))
+        return render_template('addnotes.html')
     else:
-        return redirect(url_for('login'))  
+        return redirect(url_for('login'))
 @app.route('/viewnotes')
 def viewnotes():
     if session.get('user'):
-       username=session.get('user')
-       cursor=mydb.cursor(buffered=True)
-       cursor.execute('select bin_to_uuid(nid) as uid,title,date from notes where added_by=%s order by date desc',[username])
-       data=cursor.fetchall()
-       cursor.close()
-       return render_template('table.html',data=data)
+        username=session.get('user')
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select bin_to_uuid(nid) as uid,title,date from notes where added_by=%s order by date desc',[username])
+        data=cursor.fetchall()
+        cursor.close()
+        return render_template('table.html',data=data)
     else:
-        return redirect(url_for('login')) 
+        return redirect(url_for('login'))
 @app.route('/nid/<uid>')
 def vnid(uid):
     if session.get('user'):
@@ -267,7 +267,7 @@ def delete(uid):
         return redirect(url_for('viewnotes'))
     else:
         return redirect(url_for('login'))
-    
+
 @app.route('/update/<uid>',methods=['GET','POST'])
 def update(uid):
     if session.get('user'):
@@ -294,13 +294,13 @@ def fileupload():
             files=request.files.getlist('file')
             username=session.get('user')
             cursor=mydb.cursor(buffered=True)
-            for file in files:
+            for file in files: 
                 file_ext=file.filename.split('.')[-1]
                 file_data=file.read()#reads binary data from file
                 cursor.execute('insert into files(fid,extension,filedata,added_by) values(uuid_to_bin(uuid()),%s,%s,%s)',[file_ext,file_data,username])
                 mydb.commit()
             cursor.close()
-            flash('file uploded successfully')
+            flash('files uploded successfully')
             return redirect(url_for('filesview'))
         return render_template('fileupload.html')
     else:
@@ -323,11 +323,11 @@ def viewfid(uid):
         ext,bin_data=cursor.fetchone()
         bytes_data=BytesIO(bin_data)
         filename=f'attachement.{ext}'
-        return send_file(bytes_data,download_name=filename)
+        return send_file(bytes_data,download_name=filename,as_attachment=False)
     else:
         return redirect(url_for('login'))
-@app.route('/downloadfile/<uid>')
-def downloadfile(uid):
+@app.route('/download/<uid>')
+def download(uid):
     if session.get('user'):
         cursor=mydb.cursor(buffered=True)
         cursor.execute('select extension,filedata from files where bin_to_uuid(fid)=%s',[uid])
@@ -337,8 +337,8 @@ def downloadfile(uid):
         return send_file(bytes_data,download_name=filename,as_attachment=True)
     else:
         return redirect(url_for('login'))
-@app.route('/deletefile/<uid>')
-def deletefile(uid):
+@app.route('/filedelete/<uid>')
+def filedelete(uid):
     if session.get('user'):
         cursor=mydb.cursor(buffered=True)
         cursor.execute('delete from files where bin_to_uuid(fid)=%s',[uid])
@@ -347,20 +347,19 @@ def deletefile(uid):
         flash('file deleted successfully')
         return redirect(url_for('filesview'))
     else:
-        return redirect(url_for('login'))  
+        return redirect(url_for('login'))
 @app.route('/getnotesdata')
 def getdata():
     if session.get('user'):
         username=session.get('user')
         cursor=mydb.cursor(buffered=True)
-        columns=['Title','content','Date']
+        columns=['Title','Content','Date']
         cursor.execute('select title,content,date from notes where added_by=%s',[username])
         data=cursor.fetchall()
         array_data=[list(i) for i in data]
         array_data.insert(0,columns)
-        return excel.make_response_from_array(array_data,'xlsx',filename='notesdata')  
+        return excel.make_response_from_array(array_data,'xlsx',filename='notesdata')
     else:
         return redirect(url_for('login'))
-if __name__=="__main__" :        
-  app.run()
-
+if __name__=='__main__':
+    app.run()
