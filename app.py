@@ -14,10 +14,10 @@ app.config['SESSION_TYPE']='filesystem'
 Session(app)
 excel.init_excel(app)
 #mydb=mysql.connector.connect(host='localhost',user='root',password='14122002',db='prm')
-db=os.environ['RDS_DB_NAME'],
-user=os.environ['RDS_USERNAME'],
-host=os.environ['RDS_HOSTNAME'],
-password=os.environ['RDS_password']
+db= os.environ['RDS_DB_NAME']
+user=os.environ['RDS_USERNAME']
+password=os.environ['RDS_PASSWORD']
+host=os.environ['RDS_HOSTNAME']
 port=os.environ['RDS_PORT']
 with mysql.connector.connect(host=host,user=user,password=password,db=db) as conn:
     cursor=conn.cursor(buffered=True)
